@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>TerraWind — ESP32 IoT Monitor</title>
+<link rel="icon" type="image/png" href="https://res.cloudinary.com/dfyvcvdkd/image/upload/e_upscale/terrawind-logo_jthhew.png">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ══════════════════════════════════
+   CUSTOM COLOR PALETTE TERRAWIND
+   Kuning #fbc907 | Hijau Kuning #bac84f | Biru Navy #164172
+   Putih Lembut #f0f7f1 | Coklat Tua #7f4e12 | Hijau Mint #6dc286
+   Biru Light #85bad7 | Hijau Teal #1b785f | Hijau Army #488e3d
+══════════════════════════════════ */
+:root { --tr: 0.3s ease; }
+
+[data-theme="dark"] {
+  --bg:#0a0f14; --bg-card:#131a24; --bg-nav:rgba(10,15,20,0.93);
+  --bg-thead:#1a2633; --bg-tr:#131a24; --bg-tr-alt:#16202d; --bg-inp:#1a2633;
+  --text:#dce8f0; --muted:#6b8a9f; --thead-col:#a8c8e0;
+  --border:rgba(109,194,134,0.15); --border-t:rgba(109,194,134,0.08);
+  --grid:rgba(109,194,134,0.04); --glow:rgba(27,120,95,0.15);
+  --accent:#6dc286; --accent-alt:#488e3d; --accent-light:#85bad7;
+  --warn:#fbc907; --teal:#1b785f;
+  --nav-act:rgba(109,194,134,0.12); --shadow:0 8px 32px rgba(0,0,0,0.6);
+  --sb:#2a4a3a; --cgrid:rgba(255,255,255,0.05); --ctick:#6b8a9f;
+}
+[data-theme="light"] {
+  --bg:#f5f9f7; --bg-card:rgba(255,255,255,0.88); --bg-nav:rgba(245,249,247,0.95);
+  --bg-thead:#e8f3ee; --bg-tr:rgba(255,255,255,0.78); --bg-tr-alt:rgba(218,244,235,0.65); --bg-inp:#e8f3ee;
+  --text:#164172; --muted:#4a7380; --thead-col:#1b4a60;
+  --border:rgba(27,120,95,0.22); --border-t:rgba(27,120,95,0.14);
+  --grid:rgba(27,120,95,0.06); --glow:rgba(109,194,134,0.18);
+  --accent:#1b785f; --accent-alt:#488e3d; --accent-light:#6dc286;
+  --warn:#7f4e12; --teal:#1b785f;
+  --nav-act:rgba(109,194,134,0.15); --shadow:0 8px 32px rgba(27,120,95,0.15);
+  --sb:#b8d4cc; --cgrid:rgba(0,0,0,0.05); --ctick:#4a7380;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);font-family:'Rajdhani',sans-serif;color:var(--text);min-height:100vh;overflow-x:hidden;transition:background var(--tr),color var(--tr)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--sb);border-radius:99px}
+
+/* ── BACKGROUND CANVAS ── */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+[data-theme="light"] #bg-canvas{opacity:.75}
+
+/* Body bg — dark: deep nature, light: soft forest gradient */
+[data-theme="dark"]  body { background: #0a0f14; }
+[data-theme="light"] body {
+  background:
+    radial-gradient(ellipse 120% 80% at 20% 10%, #c5e8d8 0%, transparent 55%),
+    radial-gradient(ellipse 100% 70% at 80% 5%,  #d0e8e0 0%, transparent 50%),
+    radial-gradient(ellipse 80%  60% at 50% 100%,#dce8d8 0%, transparent 55%),
+    radial-gradient(ellipse 60%  50% at 90% 80%, #d8e8dc 0%, transparent 50%),
+    linear-gradient(160deg, #f5f9f7 0%, #f0f8f5 40%, #f3f8f5 70%, #e8f4f0 100%);
+}
+
+/* Vignette / overlay glow */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+}
+[data-theme="dark"] body::after {
+  background:
+    radial-gradient(ellipse 70% 45% at 50% -5%, rgba(109,194,134,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 95% 95%, rgba(27,120,95,0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 35% 25% at 5%  85%, rgba(72,142,61,0.10) 0%, transparent 55%);
+}
+[data-theme="light"] body::after {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%,   rgba(109,194,134,0.28) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 90% 90%,  rgba(27,120,95,0.15) 0%, transparent 55%),
+    radial-gradient(ellipse 35% 25% at 5%  80%,  rgba(72,142,61,0.12)  0%, transparent 55%),
+    radial-gradient(ellipse 50% 35% at 75% 20%,  rgba(133,186,215,0.15) 0%, transparent 50%);
+}
+.z1{position:relative;z-index:1}
+
+/* ══════════════════════════════════
+   HEADER
+══════════════════════════════════ */
+.hdr{position:sticky;top:0;z-index:200;background:var(--bg-nav);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:0 18px;transition:background var(--tr)}
+.hdr-in{max-width:1400px;margin:0 auto;height:66px;display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.logo{display:flex;align-items:center;gap:11px;flex-shrink:0;min-width:0}
+.logo>div{min-width:0;overflow:hidden}
+.logo-ico{width:48px;height:48px;background:linear-gradient(135deg,rgba(109,194,134,.15),rgba(27,120,95,.15));border:1px solid rgba(109,194,134,.3);border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px rgba(109,194,134,.25),0 0 6px rgba(27,120,95,.2);animation:pulseL 3s ease-in-out infinite;flex-shrink:0}
+@keyframes pulseL{0%,100%{box-shadow:0 0 18px rgba(109,194,134,.25),0 0 6px rgba(27,120,95,.2)}50%{box-shadow:0 0 28px rgba(109,194,134,.5),0 0 14px rgba(27,120,95,.35)}}
+.logo h1{font-family:'Orbitron',monospace;font-size:1.15rem;font-weight:800;color:#4a7c2c;letter-spacing:2px;line-height:1}
+[data-theme="light"] .logo h1{color:#4a7c2c}
+.logo small{font-size:.72rem;color:var(--muted);letter-spacing:3px}
+
+.pnav{display:flex;align-items:center;gap:3px;list-style:none}
+.pnav li button{background:none;border:none;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:.92rem;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:6px 14px;border-radius:8px;transition:all .2s;white-space:nowrap}
+.pnav li button:hover{color:var(--text);background:var(--nav-act)}
+.pnav li button.active{color:var(--accent);background:var(--nav-act);border:1px solid var(--border)}
+
+.hdr-r{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.pill{display:flex;align-items:center;gap:6px;background:rgba(109,194,134,.08);border:1px solid rgba(109,194,134,.25);border-radius:999px;padding:6px 14px;font-size:.82rem;color:var(--accent);letter-spacing:1px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:blink 1.5s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+#clock{font-family:'Orbitron',monospace;font-size:.85rem;color:var(--muted);letter-spacing:2px}
+.tbtn{width:38px;height:38px;border-radius:9px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ══════════════════════════════════
+   PAGES
+══════════════════════════════════ */
+.page{display:none}.page.active{display:block}
+.wrap{max-width:1400px;margin:0 auto;padding:24px 18px 40px}
+.sec{font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:4px;color:var(--muted);text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.sec::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+
+/* ══════════════════════════════════
+   PAGE 1 — CARDS
+══════════════════════════════════ */
+.sbar{display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:13px;margin-bottom:22px;overflow:hidden;transition:background var(--tr)}
+.si{flex:1;padding:15px 16px;text-align:center;border-right:1px solid var(--border)}.si:last-child{border-right:none}
+.sn{font-family:'Orbitron',monospace;font-size:1.55rem;font-weight:700;color:var(--accent)}
+.sl{font-size:.72rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-top:3px}
+
+.astrip{background:rgba(251,201,7,.09);border:1px solid rgba(251,201,7,.28);border-radius:9px;padding:10px 16px;font-size:.88rem;color:var(--warn);letter-spacing:1px;margin-bottom:16px;display:none;align-items:center;gap:9px}.astrip.show{display:flex}
+
+.sc{background:var(--bg-card);border:1px solid var(--border);border-radius:15px;padding:20px 18px;position:relative;overflow:hidden;transition:transform .25s,box-shadow .25s,background var(--tr);height:100%}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ca,var(--accent));opacity:.8}
+.sc::after{content:'';position:absolute;bottom:-38px;right:-38px;width:90px;height:90px;background:radial-gradient(circle,var(--ca,var(--accent)),transparent 70%);opacity:.04;pointer-events:none}
+.sc:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.ct{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.ico{width:46px;height:46px;border-radius:10px;background:rgba(128,128,128,.06);border:1px solid rgba(128,128,128,.1);display:flex;align-items:center;justify-content:center;font-size:21px}
+.bdg{font-size:.68rem;letter-spacing:2px;text-transform:uppercase;padding:4px 9px;border-radius:4px;background:rgba(128,128,128,.08);color:var(--muted)}
+.lbl{font-size:.76rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.val{font-family:'Orbitron',monospace;font-size:2.2rem;font-weight:700;line-height:1;color:var(--ca,var(--accent));text-shadow:0 0 16px var(--ca,var(--accent));transition:all .4s}
+.unt{font-size:.85rem;color:var(--muted);margin-left:4px}
+.sub{font-size:.78rem;color:var(--muted);margin-top:6px}
+.gb{margin-top:12px;height:4px;background:rgba(128,128,128,.1);border-radius:99px;overflow:hidden}
+.gf{height:100%;border-radius:99px;background:var(--ca,var(--accent));box-shadow:0 0 6px var(--ca,var(--accent));transition:width 1s cubic-bezier(.4,0,.2,1)}
+.spk{margin-top:12px;height:38px}.spk svg{width:100%;height:100%;overflow:visible}
+
+@keyframes wSpin{to{transform:rotate(360deg)}}.wspin{display:inline-block;animation:wSpin 2s linear infinite}
+@keyframes tRock{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}.tanim{display:inline-block;animation:tRock 3s ease-in-out infinite}
+@keyframes cIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}.cw{animation:cIn .5s ease-out both}
+.cw:nth-child(1){animation-delay:.05s}.cw:nth-child(2){animation-delay:.1s}.cw:nth-child(3){animation-delay:.15s}
+.cw:nth-child(4){animation-delay:.2s}.cw:nth-child(5){animation-delay:.25s}.cw:nth-child(6){animation-delay:.3s}
+.cw:nth-child(7){animation-delay:.35s}.cw:nth-child(8){animation-delay:.4s}.cw:nth-child(9){animation-delay:.45s}.cw:nth-child(10){animation-delay:.5s}
+@keyframes vIn{from{opacity:0;transform:translateY(5px)}to{opacity:1}}.vin{animation:vIn .35s ease-out}
+@keyframes pShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)rotate(-1deg)}40%{transform:translateX(3px)rotate(1deg)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}.pshake{animation:pShake .4s ease-in-out}
+
+.lu{font-size:.76rem;color:var(--muted);letter-spacing:1px;text-align:right;margin-top:10px}
+.ts{font-size:.7rem;color:var(--muted);letter-spacing:.5px;margin-top:7px;opacity:.75;display:flex;align-items:center;gap:4px}
+.ts::before{content:'🕐';font-size:.72rem}
+
+/* ══════════════════════════════════
+   PAGE 2 — CHARTS
+══════════════════════════════════ */
+.cc{background:var(--bg-card);border:1px solid var(--border);border-radius:15px;padding:22px 20px;margin-bottom:20px;transition:background var(--tr);min-width:0}
+.cc-ttl{font-family:'Orbitron',monospace;font-size:.76rem;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:15px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.cc-ttl span{color:var(--accent)}
+.cw2{position:relative;height:200px}
+@media(min-width:768px){.cw2{height:250px}}
+
+.rtabs{display:flex;gap:4px}
+.rtab{font-family:'Rajdhani',sans-serif;font-size:.76rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;background:rgba(128,128,128,.07);border:1px solid var(--border);border-radius:6px;padding:4px 12px;cursor:pointer;color:var(--muted);transition:all .2s}
+.rtab:hover{color:var(--text)}
+.rtab.active{background:var(--nav-act);border-color:var(--accent);color:var(--accent)}
+
+/* ══════════════════════════════════
+   PAGE 3 — TABLE
+══════════════════════════════════ */
+.tctrl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.tctrl input{background:var(--bg-inp);border:1px solid var(--border);border-radius:8px;padding:9px 14px;font-size:.9rem;font-family:'Rajdhani',sans-serif;color:var(--text);letter-spacing:1px;outline:none;transition:border-color .2s;flex:1;min-width:140px;max-width:280px}
+.tctrl input:focus{border-color:var(--accent)}
+.tctrl input::placeholder{color:var(--muted)}
+.dlbtn{display:flex;align-items:center;gap:7px;border:none;border-radius:8px;padding:9px 17px;font-family:'Rajdhani',sans-serif;font-size:.88rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:opacity .2s;white-space:nowrap}
+.dlbtn:hover{opacity:.82}
+.dlcsv{background:linear-gradient(135deg,var(--accent),var(--accent-light));color:#0a0f14}
+.dljson{background:linear-gradient(135deg,var(--accent-alt),var(--warn));color:#fff}
+
+.tw{background:var(--bg-card);border:1px solid var(--border);border-radius:13px;overflow:hidden;transition:background var(--tr)}
+.tscr{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.dt{width:100%;border-collapse:collapse;font-size:.88rem}
+table.dt thead tr{background:var(--bg-thead)}
+table.dt th{padding:13px 15px;text-align:left;font-family:'Orbitron',monospace;font-size:.66rem;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--thead-col);border-bottom:1px solid var(--border-t);white-space:nowrap}
+table.dt td{padding:11px 15px;border-bottom:1px solid var(--border-t);color:var(--text);letter-spacing:.5px;white-space:nowrap;transition:color var(--tr)}
+table.dt tbody tr:nth-child(odd){background:var(--bg-tr-alt)}
+table.dt tbody tr:nth-child(even){background:var(--bg-tr)}
+table.dt tbody tr:hover{background:var(--nav-act)}
+.mn{font-family:'Orbitron',monospace;font-size:.78rem}
+.chip{display:inline-block;padding:3px 10px;border-radius:4px;font-size:.7rem;font-weight:600;letter-spacing:1px}
+.cok{background:rgba(109,194,134,.12);color:var(--accent)}
+.cwn{background:rgba(251,201,7,.14);color:var(--warn)}
+.cdgr{background:rgba(127,78,18,.14);color:var(--warn)}
+
+.tfoot2{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:13px 16px;border-top:1px solid var(--border-t);font-size:.78rem;color:var(--muted);letter-spacing:1px}
+.pgbtn{background:var(--bg-inp);border:1px solid var(--border);border-radius:6px;color:var(--muted);padding:5px 14px;cursor:pointer;font-size:.82rem;transition:border-color .2s}.pgbtn:hover{border-color:var(--accent)}
+
+/* ══════════════════════════════════
+   FOOTER
+══════════════════════════════════ */
+.foot{border-top:1px solid var(--border);padding:13px 20px;text-align:center;font-size:.62rem;color:var(--muted);letter-spacing:2px}
+
+/* ══════════════════════════════════════════════════
+   RESPONSIVE — MOBILE FIRST
+   breakpoints: xs<480  sm<640  md<768  lg<1024  xl+
+══════════════════════════════════════════════════ */
+
+/* ── HEADER ── */
+.hdr-in{flex-wrap:nowrap}
+
+@media(max-width:639px){
+  .hdr{padding:0 12px}
+  .hdr-in{flex-wrap:wrap;height:auto;padding:10px 0 0;gap:0}
+  .logo{flex:1}
+  .logo-ico{width:40px;height:40px}
+  .logo h1{font-size:.95rem;letter-spacing:1.5px}
+  .logo small{font-size:.65rem;letter-spacing:2px}
+  .hdr-r{gap:8px}
+  #clock{display:none}
+  .pnav{order:3;width:100%;justify-content:center;border-top:1px solid var(--border);padding:6px 0 8px;gap:2px}
+  .pnav li{flex:1;text-align:center}
+  .pnav li button{width:100%;padding:8px 4px;font-size:.82rem;letter-spacing:.8px;border-radius:6px}
+}
+
+@media(max-width:400px){
+  #connLabel{display:none}
+  .pill{padding:5px 8px}
+}
+
+/* ── SUMMARY BAR ── */
+@media(max-width:479px){
+  .sbar{flex-wrap:wrap}
+  .si{flex:1 1 45%;border-right:none !important;border-bottom:1px solid var(--border)}
+  .si:nth-child(odd){border-right:1px solid var(--border) !important}
+  .si:nth-last-child(-n+2){border-bottom:none}
+  .sn{font-size:1.3rem}
+  .sl{font-size:.66rem}
+}
+
+/* ── SENSOR CARDS ── */
+@media(max-width:479px){
+  .sc{padding:15px 13px}
+  .val{font-size:1.9rem}
+  .lbl{font-size:.72rem}
+  .sub{font-size:.74rem}
+  .ico{width:40px;height:40px;font-size:19px}
+  .spk{height:32px}
+  .ts{font-size:.66rem}
+}
+
+/* ── WRAP PADDING ── */
+@media(max-width:639px){.wrap{padding:14px 10px 80px}}
+@media(min-width:640px){.wrap{padding:20px 16px 40px}}
+@media(min-width:1024px){.wrap{padding:26px 22px 40px}}
+
+/* ── SECTION TITLE ── */
+@media(max-width:479px){
+  .sec{font-size:.66rem;letter-spacing:2.5px;margin-bottom:12px}
+}
+
+/* ── CHART CARDS ── */
+@media(max-width:479px){
+  .cc{padding:15px 13px;margin-bottom:14px}
+  .cc-ttl{font-size:.68rem;letter-spacing:2px;flex-direction:column;align-items:flex-start;gap:8px}
+  .cw2{height:180px}
+  .rtab{font-size:.7rem;padding:4px 8px}
+}
+@media(min-width:480px) and (max-width:767px){.cw2{height:200px}}
+@media(min-width:768px){.cw2{height:250px}}
+
+/* ── TABLE PAGE ── */
+@media(max-width:639px){
+  .tctrl{gap:8px}
+  .tctrl input{min-width:100%;max-width:100%;font-size:.85rem}
+  .dlbtn{flex:1;justify-content:center;font-size:.82rem;padding:9px 10px}
+  table.dt th{font-size:.6rem;padding:10px 9px;letter-spacing:1px}
+  table.dt td{padding:9px 9px;font-size:.82rem}
+  .mn{font-size:.7rem}
+  .tfoot2{flex-direction:column;align-items:flex-start;gap:6px;font-size:.74rem}
+  .pgbtn{font-size:.78rem}
+}
+@media(max-width:479px){
+  table.dt th:nth-child(6),table.dt td:nth-child(6),
+  table.dt th:nth-child(7),table.dt td:nth-child(7){display:none}
+}
+
+/* ── ALERT ── */
+@media(max-width:479px){.astrip{font-size:.82rem;padding:9px 12px}}
+
+/* ── FOOTER ── */
+@media(max-width:479px){.foot{font-size:.66rem;letter-spacing:1px;padding:12px 10px}}
+
+/* ── BOTTOM NAV ACTIVE INDICATOR ── */
+@media(max-width:639px){
+  .pnav li button.active{background:var(--nav-act);border-bottom:2px solid var(--accent);border-radius:0}
+}
+
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="z1">
+
+<!-- ═══ HEADER ═══ -->
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="logo">
+      <div class="logo-ico" id="logo-svg">
+        <img src="https://res.cloudinary.com/dfyvcvdkd/image/upload/e_upscale/terrawind-logo_jthhew.png" alt="TerraWind Logo" style="width:100%; height:100%; object-fit:contain;">
+      </div>
+      <div>
+        <h1>TERRA<span style="color:#00549c">WIND</span></h1>
+        <small>ESP32 · DHT22 · IoT MONITOR</small>
+      </div>
+    </div>
+
+    <ul class="pnav">
+      <li><button class="active" onclick="goPage('p1',this)">📊 Monitor</button></li>
+      <li><button onclick="goPage('p2',this)">📈 Grafik</button></li>
+      <li><button onclick="goPage('p3',this)">🗃️ Data</button></li>
+    </ul>
+
+    <div class="hdr-r">
+      <div class="pill" id="connBadge"><div class="dot"></div><span id="connLabel">LIVE</span></div>
+      <span id="clock"></span>
+      <button class="tbtn" id="tbtn" title="Toggle Tema" onclick="toggleTheme()">☀️</button>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════
+     PAGE 1 — MONITOR
+═══════════════════════════════════════════ -->
+<div id="p1" class="page active">
+<div class="wrap">
+
+  <div class="sbar">
+    <div class="si"><div class="sn">9</div><div class="sl">Sensor Aktif</div></div>
+    <div class="si"><div class="sn">1</div><div class="sl">Perangkat</div></div>
+    <div class="si"><div class="sn" id="sum-upd">12</div><div class="sl">Update/mnt</div></div>
+    <div class="si"><div class="sn" style="color:var(--accent)" id="sum-stat">OK</div><div class="sl">Status</div></div>
+  </div>
+
+  <div class="astrip" id="astrip">⚠️ <span id="amsg"></span></div>
+
+  <div class="sec">Pembacaan Sensor Real-Time</div>
+
+  <div class="row g-3">
+    <!-- Suhu -->
+    <div class="col-12 col-sm-6 col-lg-4 cw">
+      <div class="sc" style="--ca:#fbc907">
+        <div class="ct"><div class="ico">🌡️</div><span class="bdg">DHT22</span></div>
+        <div class="lbl">Suhu Udara</div>
+        <div><span class="val" id="v-suhu">—</span><span class="unt">°C</span></div>
+        <div class="sub" id="s-suhu">Memuat...</div>
+        <div class="gb"><div class="gf" id="g-suhu" style="width:0"></div></div>
+        <div class="spk"><svg id="sp-suhu"></svg></div>
+        <div class="ts" id="ts-suhu">—</div>
+      </div>
+    </div>
+    <!-- Kelembaban -->
+    <div class="col-12 col-sm-6 col-lg-4 cw">
+      <div class="sc" style="--ca:#85bad7">
+        <div class="ct"><div class="ico">💧</div><span class="bdg">DHT22</span></div>
+        <div class="lbl">Kelembaban Udara</div>
+        <div><span class="val" id="v-kel">—</span><span class="unt">%RH</span></div>
+        <div class="sub" id="s-kel">Memuat...</div>
+        <div class="gb"><div class="gf" id="g-kel" style="width:0"></div></div>
+        <div class="spk"><svg id="sp-kel"></svg></div>
+        <div class="ts" id="ts-kel">—</div>
+      </div>
+    </div>
+    <!-- Angin -->
+    <div class="col-12 col-sm-6 col-lg-4 cw">
+      <div class="sc" style="--ca:#6dc286">
+        <div class="ct"><div class="ico"><span class="wspin">🌀</span></div><span class="bdg">Anemometer</span></div>
+        <div class="lbl">Kecepatan Angin</div>
+        <div><span class="val" id="v-angin">—</span><span class="unt">m/s</span></div>
+        <div class="sub" id="s-angin">Memuat...</div>
+        <div class="gb"><div class="gf" id="g-angin" style="width:0"></div></div>
+        <div class="spk"><svg id="sp-angin"></svg></div>
+        <div class="ts" id="ts-angin">—</div>
+      </div>
+    </div>
+    <!-- Tekanan -->
+    <div class="col-12 col-sm-6 col-lg-4 cw">
+      <div class="sc" style="--ca:#488e3d">
+        <div class="ct"><div class="ico">🔵</div><span class="bdg">BMP280</span></div>
+        <div class="lbl">Tekanan Udara</div>
+        <div><span class="val" id="v-tek">—</span><span class="unt">hPa</span></div>
+        <div class="sub" id="s-tek">Memuat...</div>
+        <div class="gb"><div class="gf" id="g-tek" style="width:0"></div></div>
+        <div class="spk"><svg id="sp-tek"></svg></div>
+        <div class="ts" id="ts-tek">—</div>
+      </div>
+    </div>
+    <!-- Ketinggian -->
+    <div class="col-12 col-sm-6 col-lg-4 cw">
+      <div class="sc" style="--ca:#bac84f">
+        <div class="ct"><div class="ico">⛰️</div><span class="bdg">BMP280</span></div>
+        <div class="lbl">Ketinggian (MDPL)</div>
+        <div><span class="val" id="v-tinggi">—</span><span class="unt">m</span></div>
+        <div class="sub" id="s-tinggi">Memuat...</div>
+        <div class="gb"><div class="gf" id="g-tinggi" style="width:0"></div></div>
+        <div class="spk"><svg id="sp-tinggi"></svg></div>
+        <div class="ts" id="ts-tinggi">—</div>
+      </div>
+    </div>
+    <!-- Kemiringan -->
+    <div class="col-12 col-sm-6 col-lg-4 cw">
+      <div class="sc" style="--ca:#7f4e12">
+        <div class="ct"><div class="ico"><span class="tanim">📐</span></div><span class="bdg">MPU6050</span></div>
+        <div class="lbl">Kemiringan</div>
+        <div><span class="val" id="v-miring">—</span><span class="unt">°</span></div>
+        <div class="sub" id="s-miring">Memuat...</div>
+        <div class="gb"><div class="gf" id="g-miring" style="width:0"></div></div>
+        <div class="spk"><svg id="sp-miring"></svg></div>
+        <div class="ts" id="ts-miring">—</div>
+      </div>
+    </div>
+    <!-- Kelembaban Tanah -->
+    <div class="col-12 col-sm-6 col-lg-4 cw">
+      <div class="sc" style="--ca:#1b785f">
+        <div class="ct"><div class="ico">🪱</div><span class="bdg">Capacitive</span></div>
+        <div class="lbl">Kelembaban Tanah</div>
+        <div><span class="val" id="v-skel">—</span><span class="unt">%</span></div>
+        <div class="sub" id="s-skel">Memuat...</div>
+        <div class="gb"><div class="gf" id="g-skel" style="width:0"></div></div>
+        <div class="spk"><svg id="sp-skel"></svg></div>
+        <div class="ts" id="ts-skel">—</div>
+      </div>
+    </div>
+    <!-- Getaran -->
+    <div class="col-12 col-sm-6 col-lg-4 cw">
+      <div class="sc" style="--ca:#fbc907" id="cpiezo">
+        <div class="ct"><div class="ico">〰️</div><span class="bdg">Piezoelectric</span></div>
+        <div class="lbl">Getaran Piezo</div>
+        <div><span class="val" id="v-piezo">—</span><span class="unt">mV</span></div>
+        <div class="sub" id="s-piezo">Memuat...</div>
+        <div class="gb"><div class="gf" id="g-piezo" style="width:0"></div></div>
+        <div class="spk"><svg id="sp-piezo"></svg></div>
+        <div class="ts" id="ts-piezo">—</div>
+      </div>
+    </div>
+    <!-- Hujan -->
+    <div class="col-12 col-sm-6 col-lg-4 cw">
+      <div class="sc" style="--ca:#85bad7">
+        <div class="ct"><div class="ico">🌧️</div><span class="bdg">Rain Sensor</span></div>
+        <div class="lbl">Status Hujan</div>
+        <div><span class="val" id="v-hujan" style="font-size:1.3rem">—</span></div>
+        <div class="sub" id="s-hujan">Memuat...</div>
+        <div class="gb"><div class="gf" id="g-hujan" style="width:0"></div></div>
+        <div class="spk"><svg id="sp-hujan"></svg></div>
+        <div class="ts" id="ts-hujan">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="lu" id="lu">— Belum ada data —</div>
+
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PAGE 2 — CHARTS
+═══════════════════════════════════════════ -->
+<div id="p2" class="page">
+<div class="wrap">
+  <div class="sec">Grafik Sensor Real-Time</div>
+
+  <!-- Chart 1: Suhu & Kelembaban -->
+  <div class="cc">
+    <div class="cc-ttl">
+      <span>🌡️ Suhu &amp; Kelembaban Udara</span>
+      <div class="rtabs" data-cid="c1">
+        <button class="rtab active" data-pts="20">Live</button>
+        <button class="rtab" data-pts="50">50pt</button>
+        <button class="rtab" data-pts="100">100pt</button>
+      </div>
+    </div>
+    <div class="cw2"><canvas id="c1"></canvas></div>
+  </div>
+
+  <!-- Chart 2: Angin -->
+  <div class="cc">
+    <div class="cc-ttl">
+      <span>🌀 Kecepatan Angin</span>
+      <div class="rtabs" data-cid="c2">
+        <button class="rtab active" data-pts="20">Live</button>
+        <button class="rtab" data-pts="50">50pt</button>
+        <button class="rtab" data-pts="100">100pt</button>
+      </div>
+    </div>
+    <div class="cw2"><canvas id="c2"></canvas></div>
+  </div>
+
+  <!-- Chart 3: Kemiringan -->
+  <div class="cc">
+    <div class="cc-ttl">
+      <span>📐 Kemiringan</span>
+      <div class="rtabs" data-cid="c3">
+        <button class="rtab active" data-pts="20">Live</button>
+        <button class="rtab" data-pts="50">50pt</button>
+        <button class="rtab" data-pts="100">100pt</button>
+      </div>
+    </div>
+    <div class="cw2"><canvas id="c3"></canvas></div>
+  </div>
+
+  <!-- Chart 4: Kelembaban Tanah -->
+  <div class="cc">
+    <div class="cc-ttl">
+      <span>🪱 Kelembaban Tanah</span>
+      <div class="rtabs" data-cid="c4">
+        <button class="rtab active" data-pts="20">Live</button>
+        <button class="rtab" data-pts="50">50pt</button>
+        <button class="rtab" data-pts="100">100pt</button>
+      </div>
+    </div>
+    <div class="cw2"><canvas id="c4"></canvas></div>
+  </div>
+
+  <!-- Chart 5: Getaran -->
+  <div class="cc">
+    <div class="cc-ttl">
+      <span>〰️ Getaran Piezo</span>
+      <div class="rtabs" data-cid="c5">
+        <button class="rtab active" data-pts="20">Live</button>
+        <button class="rtab" data-pts="50">50pt</button>
+        <button class="rtab" data-pts="100">100pt</button>
+      </div>
+    </div>
+    <div class="cw2"><canvas id="c5"></canvas></div>
+  </div>
+
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PAGE 3 — DATA TABLE
+═══════════════════════════════════════════ -->
+<div id="p3" class="page">
+<div class="wrap">
+  <div class="sec">Riwayat Data Sensor</div>
+
+  <div class="tctrl">
+    <input type="text" id="tsearch" placeholder="🔍 Cari data..." oninput="filterTbl()">
+    <input type="date" id="dfrom" onchange="filterTbl()">
+    <input type="date" id="dto" onchange="filterTbl()">
+    <button class="dlbtn dlcsv" onclick="dlCSV()">⬇ CSV</button>
+    <button class="dlbtn dljson" onclick="dlJSON()">⬇ JSON</button>
+    <span id="rcnt" style="font-size:.68rem;color:var(--muted);letter-spacing:1px;margin-left:auto"></span>
+  </div>
+
+  <div class="tw">
+    <div class="tscr">
+      <table class="dt">
+        <thead><tr>
+          <th>#</th><th>Waktu</th>
+          <th>Suhu °C</th><th>Kel. %</th><th>Angin m/s</th>
+          <th>Tekanan hPa</th><th>Ketinggian m</th><th>Kemiringan °</th>
+          <th>Kel. Tanah %</th><th>Getaran mV</th>
+          <th>Hujan</th><th>Status</th>
+        </tr></thead>
+        <tbody id="tbody">
+          <tr><td colspan="13" style="text-align:center;padding:22px;color:var(--muted)">Memuat data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tfoot2">
+      <span id="tinfo" style="color:var(--muted)">—</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="pgbtn" onclick="chPage(-1)">‹ Prev</button>
+        <span id="pginfo" style="font-size:.72rem;color:var(--muted)">1 / 1</span>
+        <button class="pgbtn" onclick="chPage(1)">Next ›</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- FOOTER -->
+<footer class="foot">TERRAWIND IoT MONITOR &nbsp;·&nbsp; ESP32 &nbsp;·&nbsp; DHT22 &nbsp;·&nbsp; SUPABASE &nbsp;·&nbsp; © 2025</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+'use strict';
+// ─── CONFIG ────────────────────────────────
+const CFG = {
+  url: 'https://bnmsprkbqhafqvmzeqmd.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJubXNwcmticWhhZnF2bXplcW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NDgwNzUsImV4cCI6MjA4NzUyNDA3NX0.DFBhlaki2Un5uEPmor_Shm_ZqL5COoCYwKWjX1btHFg',
+  table: 'monitoring_data',
+  refresh: 5000,
+  histMax: 150,
+};
+// ───────────────────────────────────────────
+
+let isDark = false;
+const hist = {};
+const ch = { labels:[], suhu:[], kel:[], angin:[], miring:[], skel:[], piezo:[] };
+const HMAX = CFG.histMax;
+
+let allRows = [], filteredRows = [];
+let curPage = 1;
+const PGSZ = 20;
+
+const charts = {};
+const rangePts = { c1:20, c2:20, c3:20, c4:20, c5:20 };
+
+/* ── THEME ── */
+function toggleTheme() {
+  isDark = !isDark;
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  document.getElementById('tbtn').textContent = isDark ? '🌙' : '☀️';
+  recolorCharts();
+}
+function cc() { return { grid: isDark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.06)', tick: isDark ? '#6b8a9f' : '#4a7380' }; }
+function recolorCharts() {
+  const c = cc();
+  Object.values(charts).forEach(ch => {
+    if (!ch) return;
+    ['x','y','y1'].forEach(ax => {
+      if (!ch.options.scales[ax]) return;
+      if (ch.options.scales[ax].grid) ch.options.scales[ax].grid.color = c.grid;
+      ch.options.scales[ax].ticks.color = c.tick;
+    });
+    ch.options.plugins.legend.labels.color = c.tick;
+    ch.update('none');
+  });
+}
+
+/* ── PAGES ── */
+function goPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.pnav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'p2') setTimeout(() => Object.values(charts).forEach(c => c?.resize()), 60);
+}
+
+/* ── CLOCK ── */
+(function tick() { document.getElementById('clock').textContent = new Date().toLocaleTimeString('id-ID',{hour12:false}); setTimeout(tick,1000); })();
+
+/* ── SPARKLINE ── */
+function addH(k,v) { if(!hist[k])hist[k]=[]; hist[k].push(v); if(hist[k].length>20)hist[k].shift(); }
+function spark(id, data, col) {
+  const svg = document.getElementById(id);
+  if (!svg || data.length < 2) return;
+  const W = svg.clientWidth||200, H = 34;
+  const mn = Math.min(...data), mx = Math.max(...data), rng = (mx-mn)||1;
+  const pts = data.map((v,i) => `${(i/(data.length-1))*W},${H-((v-mn)/rng)*(H-6)-3}`).join(' ');
+  const gid = 'g'+id;
+  const lp = pts.split(' ').pop().split(',');
+  svg.innerHTML = `<defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1">
+    <stop offset="0%" stop-color="${col}" stop-opacity=".3"/>
+    <stop offset="100%" stop-color="${col}" stop-opacity="0"/>
+  </linearGradient></defs>
+  <polygon points="0,${H} ${pts} ${W},${H}" fill="url(#${gid})"/>
+  <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="${lp[0]}" cy="${lp[1]}" r="2.8" fill="${col}" style="filter:drop-shadow(0 0 4px ${col})"/>`;
+}
+
+/* ── SAFE FIELD GETTER (tolerates typos) ── */
+function gf(d, ...keys) {
+  for (const k of keys) { if (d[k] !== undefined && d[k] !== null) return d[k]; }
+  return null;
+}
+
+/* ── GAUGE / VALUE ── */
+function gauge(id, v, mn, mx) {
+  if (v == null) return 0;
+  const pct = Math.min(100, Math.max(0, ((v-mn)/(mx-mn))*100));
+  const el = document.getElementById(id);
+  if (el) el.style.width = pct + '%';
+  return pct;
+}
+function setV(id, v, d=1) {
+  const el = document.getElementById(id); if (!el) return;
+  const s = (v!=null) ? parseFloat(v).toFixed(d) : '—';
+  if (el.textContent !== s) { el.textContent = s; el.classList.remove('vin'); void el.offsetWidth; el.classList.add('vin'); }
+}
+function setSub(id, t) { const e=document.getElementById(id); if(e) e.textContent=t; }
+function rainLbl(v) {
+  if (v==null) return {l:'—',s:'Tidak ada data',p:0};
+  if (v==1) return {l:'BASAH',s:'Hujan / kelembaban terdeteksi',p:90};
+  return {l:'KERING',s:'Tidak ada hujan',p:5};
+}
+
+/* ── RENDER CARDS ── */
+function renderCards(d) {
+  console.log('[TerraWind] Keys:', Object.keys(d).join(', '));
+
+  const suhu  = gf(d,'temprature_dht','temperature_dht','temp_dht','suhu');
+  const kel   = gf(d,'humidity_dht','hum_dht','kelembaban');
+  const angin = gf(d,'wind_speed','windspeed','kecepatan_angin');
+  const tek   = gf(d,'pressure','tekanan_udara','tekanan');
+  const alt   = gf(d,'atitude','altitude','ketinggian_mdpl','ketinggian');
+  const tilt  = gf(d,'total_tilt','tilt','kemiringan');
+  const skel  = gf(d,'soil_mosture','soil_moisture','kelembaban_tanah');
+  const piezo = gf(d,'vibration_value','vibration','getaran_piezo');
+  const rain  = gf(d,'rain_value','hujan','rain');
+
+  setV('v-suhu',suhu); gauge('g-suhu',suhu,0,50);
+  setSub('s-suhu', suhu==null?'Tidak ada data':suhu<20?'Dingin':suhu<30?'Normal':'Panas');
+  addH('su',suhu??0); spark('sp-suhu',hist.su,'#fbc907');
+
+  setV('v-kel',kel,0); gauge('g-kel',kel,0,100);
+  setSub('s-kel', kel==null?'Tidak ada data':kel<40?'Kering':kel<70?'Normal':'Lembab');
+  addH('ke',kel??0); spark('sp-kel',hist.ke,'#85bad7');
+
+  setV('v-angin',angin); gauge('g-angin',angin,0,30);
+  setSub('s-angin', angin==null?'Tidak ada data':angin<1?'Tenang':angin<5?'Sepoi-sepoi':angin<10?'Sedang':'Kencang');
+  addH('an',angin??0); spark('sp-angin',hist.an,'#6dc286');
+
+  setV('v-tek',tek,0); gauge('g-tek',tek,950,1050);
+  setSub('s-tek', tek==null?'Tidak ada data':tek<1000?'Rendah':tek<1020?'Normal':'Tinggi');
+  addH('te',tek??0); spark('sp-tek',hist.te,'#488e3d');
+
+  setV('v-tinggi',alt,0); gauge('g-tinggi',alt,0,3000);
+  setSub('s-tinggi', alt==null?'Tidak ada data':`${(+alt).toFixed(0)} m di atas laut`);
+  addH('ti',alt??0); spark('sp-tinggi',hist.ti,'#bac84f');
+
+  setV('v-miring',tilt); gauge('g-miring',Math.abs(tilt??0),0,90);
+  setSub('s-miring', tilt==null?'Tidak ada data':Math.abs(tilt)<5?'Datar':Math.abs(tilt)<20?'Miring ringan':'Kritis ⚠');
+  addH('mi',tilt??0); spark('sp-miring',hist.mi,'#7f4e12');
+  if (tilt!=null && Math.abs(tilt)>20) showAlert(`Kemiringan kritis: ${(+tilt).toFixed(1)}°`);
+
+  setV('v-skel',skel,0); gauge('g-skel',skel,0,100);
+  setSub('s-skel', skel==null?'Tidak ada data':skel<30?'Kering — perlu irigasi':skel<70?'Cukup':'Sangat lembab');
+  addH('sk',skel??0); spark('sp-skel',hist.sk,'#1b785f');
+
+  setV('v-piezo',piezo,0); gauge('g-piezo',piezo,0,1000);
+  setSub('s-piezo', piezo==null?'Tidak ada data':piezo<50?'Stabil':piezo<300?'Getaran ringan':'Getaran kuat ⚠');
+  addH('pz',piezo??0); spark('sp-piezo',hist.pz,'#fbc907');
+  if (piezo!=null && piezo>300) {
+    const el=document.getElementById('cpiezo');
+    el?.classList.remove('pshake'); void el?.offsetWidth; el?.classList.add('pshake');
+  }
+
+  const rv=rainLbl(rain);
+  document.getElementById('v-hujan').textContent=rv.l;
+  gauge('g-hujan',rv.p,0,100); setSub('s-hujan',rv.s);
+  addH('hu',rain??0); spark('sp-hujan',hist.hu,'#85bad7');
+
+  const tsStr = d.created_at
+    ? new Date(d.created_at).toLocaleString('id-ID', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})
+    : '—';
+  ['suhu','kel','angin','tek','tinggi','miring','skel','piezo','hujan'].forEach(k => {
+    const el = document.getElementById('ts-'+k);
+    if (el) el.textContent = tsStr;
+  });
+
+  const now = new Date();
+  document.getElementById('lu').textContent =
+    `ID: ${d.id ?? '—'} · Update terakhir: ${tsStr}`;
+}
+
+function showAlert(msg) {
+  const el=document.getElementById('astrip');
+  document.getElementById('amsg').textContent=msg;
+  el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),7000);
+}
+
+/* ── CHART HISTORY ── */
+let lastChartId = null;
+
+function pushCh(d) {
+  if (d.id != null && d.id === lastChartId) return;
+  lastChartId = d.id ?? null;
+
+  const lbl = d.created_at
+    ? new Date(d.created_at).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false})
+    : new Date().toLocaleTimeString('id-ID', {hour12:false});
+
+  const push=(a,v)=>{a.push(v??null);if(a.length>HMAX)a.shift()};
+  push(ch.labels,lbl);
+  push(ch.suhu,  gf(d,'temprature_dht','temperature_dht','temp_dht'));
+  push(ch.kel,   gf(d,'humidity_dht','hum_dht'));
+  push(ch.angin, gf(d,'wind_speed','windspeed'));
+  push(ch.miring,gf(d,'total_tilt','tilt','kemiringan'));
+  push(ch.skel,  gf(d,'soil_mosture','soil_moisture','kelembaban_tanah'));
+  push(ch.piezo, gf(d,'vibration_value','vibration'));
+  updCharts();
+}
+
+/* ── CHART INIT ── */
+function baseOpts(yLbl='', dual=false) {
+  const c = cc();
+  const o = {
+    responsive:true, maintainAspectRatio:false,
+    animation:{duration:280},
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{labels:{color:c.tick,font:{family:'Rajdhani',size:12},boxWidth:11,padding:12}},
+      tooltip:{backgroundColor:'#131a24',borderColor:'rgba(109,194,134,.3)',borderWidth:1,
+        titleColor:'#6dc286',bodyColor:'#a8c8e0',
+        titleFont:{family:'Orbitron',size:10},bodyFont:{family:'Rajdhani',size:12},padding:9}
+    },
+    scales:{
+      x:{grid:{color:c.grid},ticks:{color:c.tick,font:{family:'Rajdhani',size:10},maxTicksLimit:8,maxRotation:0}},
+      y:{grid:{color:c.grid},ticks:{color:c.tick,font:{family:'Rajdhani',size:10}},
+         title:{display:!!yLbl,text:yLbl,color:c.tick,font:{family:'Rajdhani',size:11}}}
+    }
+  };
+  if (dual) o.scales.y1={position:'right',grid:{drawOnChartArea:false},ticks:{color:c.tick,font:{family:'Rajdhani',size:10}}};
+  return o;
+}
+
+function mkChart(id, cfg) {
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if (!ctx) return;
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(ctx, cfg);
+}
+
+function initCharts() {
+  mkChart('c1',{type:'line',data:{labels:[],datasets:[
+    {label:'Suhu (°C)',data:[],borderColor:'#fbc907',backgroundColor:'rgba(251,201,7,.1)',borderWidth:2,pointRadius:0,tension:.4,yAxisID:'y'},
+    {label:'Kelembaban (%)',data:[],borderColor:'#85bad7',backgroundColor:'rgba(133,186,215,.1)',borderWidth:2,pointRadius:0,tension:.4,yAxisID:'y1'}
+  ]},options:baseOpts('°C',true)});
+
+  mkChart('c2',{type:'bar',data:{labels:[],datasets:[
+    {label:'Angin (m/s)',data:[],backgroundColor:'rgba(109,194,134,.5)',borderColor:'#6dc286',borderWidth:1,borderRadius:3}
+  ]},options:baseOpts('m/s')});
+
+  mkChart('c3',{type:'line',data:{labels:[],datasets:[
+    {label:'Kemiringan (°)',data:[],borderColor:'#7f4e12',backgroundColor:'rgba(127,78,18,.12)',borderWidth:2,pointRadius:0,tension:.3,fill:true}
+  ]},options:baseOpts('Derajat')});
+
+  mkChart('c4',{type:'line',data:{labels:[],datasets:[
+    {label:'Kel. Tanah (%)',data:[],borderColor:'#1b785f',backgroundColor:'rgba(27,120,95,.1)',borderWidth:2,pointRadius:0,tension:.4,fill:true}
+  ]},options:baseOpts('%')});
+
+  mkChart('c5',{type:'line',data:{labels:[],datasets:[
+    {label:'Getaran (mV)',data:[],borderColor:'#bac84f',backgroundColor:'rgba(186,200,79,.08)',borderWidth:2,pointRadius:0,tension:.2,fill:true}
+  ]},options:baseOpts('mV')});
+}
+
+function slc(arr, n) { return arr.length<=n ? [...arr] : arr.slice(arr.length-n); }
+
+function updCharts() {
+  function up(id, fn) {
+    const c=charts[id]; if(!c)return;
+    const n=rangePts[id];
+    c.data.labels=slc(ch.labels,n);
+    fn(c,n); c.update('none');
+  }
+  up('c1',(c,n)=>{c.data.datasets[0].data=slc(ch.suhu,n);c.data.datasets[1].data=slc(ch.kel,n);});
+  up('c2',(c,n)=>{c.data.datasets[0].data=slc(ch.angin,n);});
+  up('c3',(c,n)=>{c.data.datasets[0].data=slc(ch.miring,n);});
+  up('c4',(c,n)=>{c.data.datasets[0].data=slc(ch.skel,n);});
+  up('c5',(c,n)=>{c.data.datasets[0].data=slc(ch.piezo,n);});
+}
+
+document.querySelectorAll('.rtabs').forEach(wrap=>{
+  wrap.querySelectorAll('.rtab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      wrap.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      rangePts[wrap.dataset.cid]=parseInt(btn.dataset.pts);
+      updCharts();
+    });
+  });
+});
+
+/* ── TABLE ── */
+function addRow(d) {
+  if (d.id != null && allRows.some(r => r.id === d.id)) return;
+  allRows.unshift(d);
+  if (allRows.length > 1000) allRows.pop();
+  filterTbl();
+}
+
+function filterTbl() {
+  const q=document.getElementById('tsearch').value.toLowerCase();
+  const df=document.getElementById('dfrom').value;
+  const dt=document.getElementById('dto').value;
+  filteredRows=allRows.filter(r=>{
+    const ts=r.created_at?new Date(r.created_at):null;
+    if(df&&ts&&ts<new Date(df))return false;
+    if(dt&&ts&&ts>new Date(dt+'T23:59:59'))return false;
+    if(q&&!Object.values(r).join(' ').toLowerCase().includes(q))return false;
+    return true;
+  }).sort((a,b)=>(b.id??0)-(a.id??0));
+  curPage=1; renderTbl();
+}
+
+function renderTbl() {
+  const total=filteredRows.length, pages=Math.max(1,Math.ceil(total/PGSZ));
+  curPage=Math.min(curPage,pages);
+  const start=(curPage-1)*PGSZ, slice=filteredRows.slice(start,start+PGSZ);
+  document.getElementById('pginfo').textContent=`${curPage} / ${pages}`;
+  document.getElementById('tinfo').textContent=`${start+1}–${Math.min(start+PGSZ,total)} dari ${total} baris`;
+  document.getElementById('rcnt').textContent=`${total} baris`;
+  const tb=document.getElementById('tbody');
+  if(!slice.length){tb.innerHTML='<tr><td colspan="13" style="text-align:center;padding:22px;color:var(--muted)">Tidak ada data</td></tr>';return;}
+  tb.innerHTML=slice.map((r,i)=>{
+    const ts=r.created_at?new Date(r.created_at).toLocaleString('id-ID'):'—';
+    const _suhu  = gf(r,'temprature_dht','temperature_dht','temp_dht');
+    const _kel   = gf(r,'humidity_dht','hum_dht');
+    const _angin = gf(r,'wind_speed','windspeed');
+    const _tek   = gf(r,'pressure','tekanan_udara');
+    const _alt   = gf(r,'atitude','altitude','ketinggian_mdpl');
+    const _tilt  = gf(r,'total_tilt','tilt','kemiringan');
+    const _skel  = gf(r,'soil_mosture','soil_moisture','kelembaban_tanah');
+    const _pz    = gf(r,'vibration_value','vibration');
+    const _rain  = gf(r,'rain_value','hujan');
+
+    const skelLvl = _skel==null ? 0 : _skel < 27 ? 0 : _skel <= 54 ? 1 : 2;
+    const tiltLvl = _tilt==null ? 0 : Math.abs(_tilt) < 15 ? 0 : Math.abs(_tilt) <= 30 ? 1 : 2;
+    const anginLvl= _angin==null? 0 : _angin < 1.6 ? 0 : _angin <= 8 ? 1 : 2;
+    const maxLvl  = Math.max(skelLvl, tiltLvl, anginLvl);
+    const chip    = maxLvl === 2
+      ? '<span class="chip cdgr">BAHAYA</span>'
+      : maxLvl === 1
+        ? '<span class="chip cwn">WASPADA</span>'
+        : '<span class="chip cok">AMAN</span>';
+
+    const rl     = rainLbl(_rain);
+    const fmt    = (v,d=1) => v!=null ? parseFloat(v).toFixed(d) : '—';
+    return `<tr>
+      <td class="mn" style="color:var(--muted)">${start+i+1}</td>
+      <td style="color:var(--muted);font-size:.7rem">${ts}</td>
+      <td class="mn" style="color:#fbc907">${fmt(_suhu)}</td>
+      <td class="mn" style="color:#85bad7">${fmt(_kel,0)}</td>
+      <td class="mn" style="color:#6dc286">${fmt(_angin)}</td>
+      <td class="mn" style="color:#488e3d">${fmt(_tek,0)}</td>
+      <td class="mn" style="color:#bac84f">${fmt(_alt,0)}</td>
+      <td class="mn" style="color:#7f4e12">${fmt(_tilt)}</td>
+      <td class="mn" style="color:#1b785f">${fmt(_skel,0)}</td>
+      <td class="mn" style="color:#bac84f">${fmt(_pz,0)}</td>
+      <td class="mn" style="font-size:.7rem">${rl.l}</td>
+      <td>${chip}</td>
+    </tr>`;
+  }).join('');
+}
+
+function chPage(d) {
+  const pages=Math.max(1,Math.ceil(filteredRows.length/PGSZ));
+  curPage=Math.max(1,Math.min(pages,curPage+d)); renderTbl();
+}
+
+/* ── DOWNLOAD ── */
+function dlCSV() {
+  const cols=['created_at','temprature_dht','humidity_dht','wind_speed','pressure','atitude','total_tilt','soil_mosture','vibration_value','rain_value'];
+  const blob=new Blob([cols.join(',')+'\n'+filteredRows.map(r=>cols.map(c=>r[c]??'').join(',')).join('\n')],{type:'text/csv;charset=utf-8;'});
+  dl(blob,`sensor_${dtag()}.csv`);
+}
+function dlJSON() {
+  dl(new Blob([JSON.stringify(filteredRows,null,2)],{type:'application/json'}),`sensor_${dtag()}.json`);
+}
+function dl(blob,name) {
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+function dtag(){return new Date().toISOString().slice(0,16).replace(/[T:]/g,'-');}
+
+/* ── SUPABASE ── */
+async function fetchLatest() {
+  try {
+    const res=await fetch(`${CFG.url}/rest/v1/${CFG.table}?order=id.desc&limit=1`,
+      {headers:{apikey:CFG.key,Authorization:`Bearer ${CFG.key}`}});
+    if(!res.ok)throw new Error(res.status);
+    const rows=await res.json();
+    if(rows?.length){
+      renderCards(rows[0]);
+      pushCh(rows[0]);
+      addRow(rows[0]);
+      setConnStatus(true);
+    }
+  } catch(e) {
+    setConnStatus(false);
+  }
+}
+
+function setConnStatus(online) {
+  const badge = document.getElementById('connBadge');
+  const label = document.getElementById('connLabel');
+  const dot   = document.querySelector('.dot');
+  if (online) {
+    if (label) label.textContent = 'LIVE';
+    if (dot)   { dot.style.background='var(--accent)'; dot.style.animationPlayState='running'; }
+    if (badge) { badge.style.borderColor='rgba(109,194,134,.25)'; badge.style.color='var(--accent)'; }
+  } else {
+    if (label) label.textContent = 'OFFLINE';
+    if (dot)   { dot.style.background='var(--warn)'; dot.style.animationPlayState='paused'; }
+    if (badge) { badge.style.borderColor='rgba(251,201,7,.3)'; badge.style.color='var(--warn)'; }
+  }
+}
+
+async function fetchHist() {
+  try {
+    const res=await fetch(`${CFG.url}/rest/v1/${CFG.table}?order=id.desc&limit=500`,
+      {headers:{apikey:CFG.key,Authorization:`Bearer ${CFG.key}`}});
+    if(!res.ok)throw new Error();
+    const rows=await res.json();
+    if(rows?.length){
+      allRows=rows;
+      filterTbl();
+
+      const slice = rows.slice(0, HMAX).reverse();
+      slice.forEach(r => {
+        const lbl = r.created_at
+          ? new Date(r.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})
+          : '—';
+        const push=(a,v)=>{a.push(v??null);if(a.length>HMAX)a.shift()};
+        push(ch.labels,lbl);
+        push(ch.suhu,  gf(r,'temprature_dht','temperature_dht'));
+        push(ch.kel,   gf(r,'humidity_dht','hum_dht'));
+        push(ch.angin, gf(r,'wind_speed','windspeed'));
+        push(ch.miring,gf(r,'total_tilt','tilt'));
+        push(ch.skel,  gf(r,'soil_mosture','soil_moisture'));
+        push(ch.piezo, gf(r,'vibration_value','vibration'));
+        addH('su', gf(r,'temprature_dht','temperature_dht')??0);
+        addH('ke', gf(r,'humidity_dht','hum_dht')??0);
+        addH('an', gf(r,'wind_speed','windspeed')??0);
+        addH('te', gf(r,'pressure','tekanan_udara')??0);
+        addH('ti', gf(r,'atitude','altitude','ketinggian_mdpl')??0);
+        addH('mi', gf(r,'total_tilt','tilt','kemiringan')??0);
+        addH('sk', gf(r,'soil_mosture','soil_moisture','kelembaban_tanah')??0);
+        addH('pz', gf(r,'vibration_value','vibration')??0);
+        addH('hu', gf(r,'rain_value','hujan')??0);
+      });
+
+      spark('sp-suhu', hist.su, '#fbc907');
+      spark('sp-kel',  hist.ke, '#85bad7');
+      spark('sp-angin',hist.an, '#6dc286');
+      spark('sp-tek',  hist.te, '#488e3d');
+      spark('sp-tinggi',hist.ti,'#bac84f');
+      spark('sp-miring',hist.mi,'#7f4e12');
+      spark('sp-skel', hist.sk, '#1b785f');
+      spark('sp-piezo',hist.pz, '#fbc907');
+      spark('sp-hujan',hist.hu, '#85bad7');
+
+      lastChartId = rows[0]?.id ?? null;
+      updCharts();
+    }
+  } catch(e){}
+}
+
+function demo() {
+  const r=(a,b)=>parseFloat((Math.random()*(b-a)+a).toFixed(2));
+  return {temprature_dht:r(22,38),humidity_dht:r(40,90),wind_speed:r(0,15),
+    pressure:r(985,1025),atitude:r(100,500),total_tilt:r(-15,15),
+    soil_mosture:r(20,80),vibration_value:r(0,400),rain_value:Math.round(r(0,1))};
+}
+
+/* ── BACKGROUND ANIMATION ── */
+(function() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx    = canvas.getContext('2d');
+  let W, H;
+
+  function dark() { return document.documentElement.getAttribute('data-theme') !== 'light'; }
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const BLOBS = [
+    { px:.15, py:.18, vx:.00014, vy:.00009, rx:.55, ry:.38, dc:[109,194,134],   da:.14, lc:[27,120,95],  la:.18 },
+    { px:.82, py:.72, vx:-.0001, vy:.00012, rx:.45, ry:.32, dc:[72,142,61],     da:.10, lc:[133,186,215], la:.15 },
+    { px:.48, py:.52, vx:.00008, vy:-.0001, rx:.50, ry:.35, dc:[133,186,215],   da:.08, lc:[27,120,95],   la:.13 },
+    { px:.70, py:.15, vx:-.0001, vy:.00007, rx:.40, ry:.28, dc:[186,200,79],    da:.07, lc:[109,194,134], la:.12 },
+  ];
+  BLOBS.forEach(b => { b.ox=b.px; b.oy=b.py; });
+
+  function drawBlobs() {
+    const isDk = dark();
+    BLOBS.forEach(b => {
+      b.px += b.vx; b.py += b.vy;
+      const dx=b.px-b.ox, dy=b.py-b.oy;
+      if (Math.sqrt(dx*dx+dy*dy)>.20){ b.vx*=-1; b.vy*=-1; }
+      const [r,g,bv] = isDk ? b.dc : b.lc;
+      const am       = isDk ? b.da : b.la;
+      const grd = ctx.createRadialGradient(b.px*W, b.py*H, 0, b.px*W, b.py*H, Math.min(W,H)*b.rx);
+      grd.addColorStop(0,   `rgba(${r},${g},${bv},${am})`);
+      grd.addColorStop(.45, `rgba(${r},${g},${bv},${am*.35})`);
+      grd.addColorStop(1,   `rgba(${r},${g},${bv},0)`);
+      ctx.save();
+      ctx.scale(1, b.ry/b.rx);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(b.px*W, b.py*H*(b.rx/b.ry), Math.min(W,H)*b.rx, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  const HEX_SIZE = 44;
+  let hexes = [];
+
+  function buildHexes() {
+    hexes = [];
+    const cw = HEX_SIZE * 2, ch = Math.sqrt(3) * HEX_SIZE;
+    const cols = Math.ceil(W / (cw * .75)) + 2;
+    const rows = Math.ceil(H / ch) + 2;
+    for (let col=-1; col<cols; col++) {
+      for (let row=-1; row<rows; row++) {
+        const x = col * cw * .75;
+        const y = row * ch + (col % 2 ? ch*.5 : 0);
+        hexes.push({ x, y, pulse: Math.random()*Math.PI*2, speed: .003+Math.random()*.004 });
+      }
+    }
+  }
+  buildHexes();
+  window.addEventListener('resize', buildHexes);
+
+  function hexPath(x, y, s) {
+    ctx.beginPath();
+    for (let i=0;i<6;i++) {
+      const a = Math.PI/180*(60*i-30);
+      i===0 ? ctx.moveTo(x+s*Math.cos(a), y+s*Math.sin(a))
+             : ctx.lineTo(x+s*Math.cos(a), y+s*Math.sin(a));
+    }
+    ctx.closePath();
+  }
+
+  function drawHexes(t) {
+    const isDk = dark();
+    const base = isDk ? 'rgba(109,194,134,' : 'rgba(27,120,95,';
+    hexes.forEach(h => {
+      h.pulse += h.speed;
+      const alpha = isDk
+        ? (.018 + Math.sin(h.pulse)*.012)
+        : (.035 + Math.sin(h.pulse)*.020);
+      hexPath(h.x, h.y, HEX_SIZE-.5);
+      ctx.strokeStyle = base + alpha + ')';
+      ctx.lineWidth   = isDk ? .6 : .8;
+      ctx.stroke();
+    });
+  }
+
+  const PTS = Array.from({length:55}, ()=>({
+    x: Math.random()*1e4, y: Math.random()*1e4,
+    vx:(Math.random()-.5)*.3, vy:(Math.random()-.5)*.3,
+    r: Math.random()*1.6+.5, a: Math.random()*.55+.15,
+  }));
+
+  function drawParticles() {
+    const isDk = dark();
+    const col = isDk ? 'rgba(109,194,134,' : 'rgba(27,120,95,';
+    const lc  = isDk ? 'rgba(133,186,215,' : 'rgba(109,194,134,';
+    const am  = isDk ? 1 : 1.8;
+    PTS.forEach(p => {
+      p.x=(p.x+p.vx+W)%W; p.y=(p.y+p.vy+H)%H;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r*(isDk?1:1.3), 0, Math.PI*2);
+      ctx.fillStyle = col + (p.a * am * (isDk?1:.7)) + ')';
+      ctx.fill();
+    });
+    for (let i=0;i<PTS.length;i++) for (let j=i+1;j<PTS.length;j++) {
+      const dx=PTS[i].x-PTS[j].x, dy=PTS[i].y-PTS[j].y, d=Math.sqrt(dx*dx+dy*dy);
+      if (d<140) {
+        ctx.beginPath();
+        ctx.moveTo(PTS[i].x,PTS[i].y); ctx.lineTo(PTS[j].x,PTS[j].y);
+        ctx.strokeStyle = lc + ((1-d/140)*(isDk?.14:.10)) + ')';
+        ctx.lineWidth=isDk?.7:1; ctx.stroke();
+      }
+    }
+  }
+
+  const METEORS = [];
+  function spawnMeteor() {
+    if (METEORS.length > 4) return;
+    METEORS.push({
+      x: Math.random() * W * 1.2 - W*.1,
+      y: -30,
+      vx: 2.5 + Math.random()*2,
+      vy: 3.5 + Math.random()*2,
+      len: 80 + Math.random()*80,
+      life: 1,
+    });
+  }
+  setInterval(spawnMeteor, 1800 + Math.random()*2000);
+
+  function drawMeteors() {
+    const isDk = dark();
+    for (let i=METEORS.length-1;i>=0;i--) {
+      const m=METEORS[i];
+      m.x+=m.vx; m.y+=m.vy; m.life-=.014;
+      if (m.life<=0||m.y>H+30){ METEORS.splice(i,1); continue; }
+      const tx=m.x-m.vx/m.vy*m.len*1.2, ty=m.y-m.len;
+      const grd=ctx.createLinearGradient(tx,ty,m.x,m.y);
+      if (isDk) {
+        grd.addColorStop(0,`rgba(220,232,240,0)`);
+        grd.addColorStop(.6,`rgba(133,186,215,${m.life*.35})`);
+        grd.addColorStop(1,`rgba(220,232,240,${m.life*.7})`);
+      } else {
+        grd.addColorStop(0,`rgba(27,120,95,0)`);
+        grd.addColorStop(.6,`rgba(109,194,134,${m.life*.25})`);
+        grd.addColorStop(1,`rgba(133,186,215,${m.life*.5})`);
+      }
+      ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(m.x,m.y);
+      ctx.strokeStyle=grd; ctx.lineWidth=isDk?1.5:1.2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(m.x,m.y,isDk?2:1.5,0,Math.PI*2);
+      ctx.fillStyle=isDk?`rgba(133,186,215,${m.life*.8})`:`rgba(109,194,134,${m.life*.6})`; ctx.fill();
+    }
+  }
+
+  const ORBS = Array.from({length:4},(_,i)=>({
+    x: [.2,.7,.5,.15][i]*1000, y: [.3,.6,.15,.75][i]*1000,
+    vx:(.3+Math.random()*.2)*(i%2?1:-1),
+    vy:(.2+Math.random()*.2)*(i%2?-1:1),
+    r: 90+Math.random()*70,
+    dc: [[109,194,134],[27,120,95],[72,142,61],[186,200,79]][i],
+    lc: [[133,186,215],[27,120,95],[109,194,134],[133,186,215]][i],
+  }));
+
+  function drawOrbs() {
+    const isDk=dark();
+    const mul = isDk ? .07 : .13;
+    ORBS.forEach(o => {
+      o.x=(o.x+o.vx+W)%W; o.y=(o.y+o.vy+H)%H;
+      const [r,g,b]= isDk ? o.dc : o.lc;
+      const grd=ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r);
+      grd.addColorStop(0,  `rgba(${r},${g},${b},${mul})`);
+      grd.addColorStop(.5, `rgba(${r},${g},${b},${mul*.4})`);
+      grd.addColorStop(1,  `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle=grd;
+      ctx.beginPath(); ctx.arc(o.x,o.y,o.r,0,Math.PI*2); ctx.fill();
+    });
+  }
+
+  let t=0;
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    t++;
+    drawBlobs();
+    drawHexes(t);
+    drawOrbs();
+    drawParticles();
+    drawMeteors();
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ── INIT ── */
+initCharts();
+fetchLatest();
+fetchHist();
+setInterval(fetchLatest, CFG.refresh);
+</script>
+</body>
+</html>
